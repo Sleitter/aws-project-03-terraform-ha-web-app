@@ -1,58 +1,60 @@
 resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
+  cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
 
   tags = {
-    Name = "hoc-terraform-vpc"
+    Name = "${var.project_name}-vpc"
   }
 }
+
 resource "aws_subnet" "public_a" {
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.1.0/24"
-  availability_zone       = "us-east-1a"
+  cidr_block              = var.public_subnet_a_cidr
+  availability_zone       = "${var.aws_region}a"
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "hoc-public-subnet-a"
+    Name = "${var.project_name}-public-subnet-a"
   }
 }
 
 resource "aws_subnet" "public_b" {
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.2.0/24"
-  availability_zone       = "us-east-1b"
+  cidr_block              = var.public_subnet_b_cidr
+  availability_zone       = "${var.aws_region}b"
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "hoc-public-subnet-b"
+    Name = "${var.project_name}-public-subnet-b"
   }
 }
 
 resource "aws_subnet" "private_a" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.11.0/24"
-  availability_zone = "us-east-1a"
+  cidr_block        = var.private_subnet_a_cidr
+  availability_zone = "${var.aws_region}a"
 
   tags = {
-    Name = "hoc-private-subnet-a"
+    Name = "${var.project_name}-private-subnet-a"
   }
 }
 
 resource "aws_subnet" "private_b" {
   vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.12.0/24"
-  availability_zone = "us-east-1b"
+  cidr_block        = var.private_subnet_b_cidr
+  availability_zone = "${var.aws_region}b"
 
   tags = {
-    Name = "hoc-private-subnet-b"
+    Name = "${var.project_name}-private-subnet-b"
   }
 }
+
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "hoc-igw"
+    Name = "${var.project_name}-igw"
   }
 }
 
@@ -60,7 +62,7 @@ resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "hoc-public-rt"
+    Name = "${var.project_name}-public-rt"
   }
 }
 
@@ -79,8 +81,9 @@ resource "aws_route_table_association" "public_b" {
   subnet_id      = aws_subnet.public_b.id
   route_table_id = aws_route_table.public.id
 }
+
 resource "aws_security_group" "alb" {
-  name        = "hoc-alb-sg"
+  name        = "${var.project_name}-alb-sg"
   description = "Allow HTTP traffic to the Application Load Balancer"
   vpc_id      = aws_vpc.main.id
 
@@ -101,12 +104,12 @@ resource "aws_security_group" "alb" {
   }
 
   tags = {
-    Name = "hoc-alb-sg"
+    Name = "${var.project_name}-alb-sg"
   }
 }
 
 resource "aws_security_group" "web" {
-  name        = "hoc-web-sg"
+  name        = "${var.project_name}-web-sg"
   description = "Allow HTTP traffic from ALB"
   vpc_id      = aws_vpc.main.id
 
@@ -127,11 +130,12 @@ resource "aws_security_group" "web" {
   }
 
   tags = {
-    Name = "hoc-web-sg"
+    Name = "${var.project_name}-web-sg"
   }
 }
+
 resource "aws_lb" "app" {
-  name               = "hoc-alb"
+  name               = "${var.project_name}-alb"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
@@ -142,12 +146,12 @@ resource "aws_lb" "app" {
   ]
 
   tags = {
-    Name = "hoc-alb"
+    Name = "${var.project_name}-alb"
   }
 }
 
 resource "aws_lb_target_group" "web" {
-  name     = "hoc-web-tg"
+  name     = "${var.project_name}-web-tg"
   port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
@@ -163,7 +167,7 @@ resource "aws_lb_target_group" "web" {
   }
 
   tags = {
-    Name = "hoc-web-tg"
+    Name = "${var.project_name}-web-tg"
   }
 }
 
@@ -177,10 +181,11 @@ resource "aws_lb_listener" "http" {
     target_group_arn = aws_lb_target_group.web.arn
   }
 }
+
 resource "aws_launch_template" "web" {
-  name_prefix   = "hoc-web-lt-"
+  name_prefix   = "${var.project_name}-web-lt-"
   image_id      = "ami-0de716d6197524dd9"
-  instance_type = "t3.micro"
+  instance_type = var.instance_type
 
   network_interfaces {
     associate_public_ip_address = true
@@ -193,17 +198,17 @@ resource "aws_launch_template" "web" {
     resource_type = "instance"
 
     tags = {
-      Name = "hoc-terraform-web-server"
+      Name = "${var.project_name}-web-server"
     }
   }
 
   tags = {
-    Name = "hoc-web-lt"
+    Name = "${var.project_name}-web-lt"
   }
 }
 
 resource "aws_autoscaling_group" "web" {
-  name = "hoc-web-asg"
+  name = "${var.project_name}-web-asg"
 
   desired_capacity = 2
   min_size         = 2
@@ -226,7 +231,7 @@ resource "aws_autoscaling_group" "web" {
 
   tag {
     key                 = "Name"
-    value               = "hoc-terraform-web-server"
+    value               = "${var.project_name}-web-server"
     propagate_at_launch = true
   }
 }
